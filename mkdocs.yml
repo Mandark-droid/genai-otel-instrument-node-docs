@@ -1,0 +1,31 @@
+site_name: genai-otel-instrument-node
+site_description: OpenTelemetry instrumentation for GenAI applications on Node.js, in browsers and in React Native.
+site_url: https://mandark-droid.github.io/genai-otel-instrument-node-docs/
+repo_url: https://www.npmjs.com/package/@traceverse/genai-otel-instrument-node
+repo_name: "@traceverse/genai-otel-instrument-node"
+copyright: Copyright © 2026 TraceVerse · Apache-2.0
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      toggle: { icon: material/brightness-7, name: Dark mode }
+    - scheme: slate
+      primary: indigo
+      toggle: { icon: material/brightness-4, name: Light mode }
+  features: [navigation.sections, navigation.top, content.code.copy, search.highlight]
+markdown_extensions:
+  - admonition
+  - tables
+  - toc: { permalink: true }
+  - pymdownx.highlight
+  - pymdownx.superfences
+nav:
+  - Overview: index.md
+  - React Native and Cactus: react-native.md
+  - Runtimes: runtimes.md
+  - Configuration: configuration.md
+  - Evaluation: evaluation.md
+  - Media: media.md
+  - GPU and energy: gpu-energy.md
+  - Parity with Python: parity-matrix.md
