@@ -81,10 +81,16 @@ await context.with(trace.setSpan(context.active(), run), async () => {
 run.end();
 ```
 
-The active context is the most recently entered scope that has not finished. When two
-pipelines run at the same time (a meeting being transcribed while the user chats), a span
-started in the older one can attach to the newer one; where that matters, pass the parent
-explicitly instead:
+Only your own `context.with()` scopes become active. The SDK's model-call spans are
+leaves and never do (from `0.1.0-alpha.5`): a call running in the background, such as an
+embedding for a search index, does not become the parent of whatever the app starts
+meanwhile. Use `0.1.0-alpha.5` or later; in alpha.4 such a call could become the root of
+an unrelated trace.
+
+The active context is the most recently entered of your scopes that has not finished.
+When two of your pipelines run at the same time (a meeting being transcribed while the
+user chats), a span started in the older one can attach to the newer one; where that
+matters, pass the parent explicitly instead:
 
 ```ts
 import { context, trace } from '@opentelemetry/api';

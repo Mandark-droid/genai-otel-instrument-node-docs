@@ -104,7 +104,8 @@ Call `setSession('chat-41', { userId })` once the app knows which conversation i
 every span from then on carries `session.id`, `gen_ai.conversation.id` and `user.id`.
 `withSession(id, fn)` works too: the entry registers a context manager that keeps a
 scope open until the promise `fn` returns settles, so the session holds across `await`
-(two overlapping scopes: the newer one wins).
+(two overlapping scopes: the newer one wins). Model calls the SDK instruments do not open
+scopes of their own here, so a call in the background never captures other spans.
 
 ### Export behaviour
 
@@ -162,7 +163,9 @@ Every span also carries `openinference.span.kind`, and the resource
 - `buildResource()` and its host / process / OS detection: Node only.
 - gRPC and http/protobuf export: Node only.
 - `AsyncLocalStorage`: context crosses `await` through a promise-scoped context manager
-  instead, which cannot tell two overlapping scopes apart (the newer one wins).
+  instead, which cannot tell two overlapping scopes apart (the newer one wins). For that
+  reason an instrumented call does not make its span the active one in these entries: nothing
+  is nested under a Cactus or transformers.js call, which are leaves anyway.
 - `sendBeacon` export on page unload: not yet.
 
 ## How it is kept true
