@@ -21,7 +21,7 @@ resource attributes: `telemetry.sdk.language=nodejs`,
 ## Install
 
 ```bash
-npm install @traceverse/genai-otel-instrument-node@next
+npm install @traceverse/genai-otel-instrument-node
 ```
 
 ## Use
@@ -81,7 +81,7 @@ setSession('chat-41');                                                   // or: 
 Every span started in scope gets `session.id`, `gen_ai.conversation.id` and, if given,
 `user.id`. `sessionIdExtractor` / `userIdExtractor` (the reference library's callbacks)
 are still supported and win for the spans they apply to. In a browser or React Native
-app use `setSession`: there `withSession` does not hold across `await`.
+app both work too (from `0.1.0-alpha.4`, `withSession` holds across `await` there as well).
 
 ## Browser and React Native
 

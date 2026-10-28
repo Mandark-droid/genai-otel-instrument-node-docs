@@ -102,8 +102,9 @@ counter is incremented.
 
 Call `setSession('chat-41', { userId })` once the app knows which conversation it is in;
 every span from then on carries `session.id`, `gen_ai.conversation.id` and `user.id`.
-`withSession(id, fn)` also exists, but with no context manager in these runtimes it
-covers only what `fn` starts synchronously.
+`withSession(id, fn)` works too: the entry registers a context manager that keeps a
+scope open until the promise `fn` returns settles, so the session holds across `await`
+(two overlapping scopes: the newer one wins).
 
 ### Export behaviour
 
@@ -136,7 +137,7 @@ instrumentCactus({ CactusLM, CactusSTT });
 | `transformers.model.load` | `from_pretrained()` (also inside `pipeline()`) | model id; `transformers.device.requested` / `transformers.device`; `transformers.dtype`; `webgpu.fallback` when WebGPU was asked for; `transformers.load.files`, `.bytes`, `.fetch_ms`, `.session_create_ms`; the `webgpu.*` adapter facts once collected |
 | `huggingface.model.generate` | `model.generate()` | input and output tokens counted from the tensors; time to first token; time per output token; `transformers.tokens_per_second`; cost |
 | `huggingface.pipeline` | a pipeline call | task, model; for feature extraction the vector count and size. No tokens: they are on the generate span |
-| `cactus.download`, `cactus.init` | `CactusLM.download()` / `init()` | model, duration |
+| `cactus.download`, `cactus.init` | `CactusLM.download()` / `init()` (no span when the model is already loaded) | model, duration |
 | `cactus.complete` | `CactusLM.complete()` | the engine's token counts, time to first token, `cactus.decode_tps`, `cactus.prefill_tps`, `cactus.ram_usage_mb`, tool calls, `cactus.cloud_handoff`; a result with `success: false` is an error span |
 
 Cost of an on-device model: from the pricing table if it is there; else the size tier
@@ -146,8 +147,13 @@ What a browser does not expose is not reported: GPU utilisation, temperature, po
 energy and CO2 are absent for on-device spans, never zero. Whether model files came from
 the cache or the network is not reported either: the library does not say.
 
-Without a context manager in these runtimes, the load, pipeline and generate spans of
-one interaction are separate traces; `setSession()` is what ties them together.
+Spans started inside `context.with(...)` (or `withSession`) are children of the span in
+that context, across `await`; started outside any, the load, pipeline and generate spans
+of one interaction are separate traces, and `setSession()` is what ties them together.
+
+Every span also carries `openinference.span.kind`, and the resource
+`openinference.project.name`, for backends built on the OpenInference conventions; see
+[React Native and Cactus: Backends](react-native.md#backends).
 
 ## Not in the browser and React Native entries
 
@@ -155,8 +161,8 @@ one interaction are separate traces; `setSession()` is what ties them together.
   `AnthropicInstrumentor`) and the `register` hook: Node only.
 - `buildResource()` and its host / process / OS detection: Node only.
 - gRPC and http/protobuf export: Node only.
-- Trace context is not propagated across `await` (there is no `AsyncLocalStorage`):
-  spans started inside a traced call are not automatically its children.
+- `AsyncLocalStorage`: context crosses `await` through a promise-scoped context manager
+  instead, which cannot tell two overlapping scopes apart (the newer one wins).
 - `sendBeacon` export on page unload: not yet.
 
 ## How it is kept true
