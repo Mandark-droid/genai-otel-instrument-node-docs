@@ -16,13 +16,7 @@ Import from the `react-native` entry: it has no Node APIs (`async_hooks`, `fs`, 
 exports over `fetch`.
 
 ```ts
-import { AppState } from 'react-native';
-import { CactusLM, CactusSTT } from 'cactus-react-native';
-import {
-  instrument,
-  instrumentCactus,
-  flushTelemetry,
-} from '@traceverse/genai-otel-instrument-node/react-native';
+import { instrument } from '@traceverse/genai-otel-instrument-node/react-native';
 
 instrument({
   serviceName: 'my-app',
@@ -31,13 +25,15 @@ instrument({
   headers: { Authorization: 'Bearer …' },
   // Prompts and replies stay off the wire unless you opt in.
   enableContentCapture: false,
-  // Flush when the app goes to the background: a backgrounded app can be killed.
-  appState: AppState,
 });
-
-// React Native cannot look packages up by name: hand the classes over.
-instrumentCactus({ CactusLM, CactusSTT });
 ```
+
+That is the only call (from `0.1.0-alpha.7`). `cactus-react-native` is instrumented when the app
+has it installed, and React Native's `AppState` is used to send what is queued when the app
+leaves the foreground; both are optional requires, so nothing breaks without them. A trace is
+also sent as soon as it finishes, since the batch timer stops while the app is in the
+background. Passing `appState`, or calling `instrumentCactus({ CactusLM, CactusSTT })`
+yourself, still works.
 
 There is no default endpoint. Telemetry leaves the phone only for a collector you name, which
 makes export something the user turns on (LiquidChat keeps it off until it is enabled in
@@ -59,7 +55,56 @@ transcriptions, `EMBEDDING` for embeddings, `CHAIN` for downloads and loads (see
 
 ## Your own spans
 
-The SDK registers the global tracer provider, so the rest of the app can add spans with
+An app's own components (its agent loop, tool dispatcher, search, pipelines) are not a library,
+so no instrumentor can find them. Wrap each in one call; the conventions come with it:
+
+```ts
+import {
+  traceAgent,
+  traceRetrieval,
+  traceTool,
+  traceWorkflow,
+} from '@traceverse/genai-otel-instrument-node/react-native';
+
+const reply = await traceAgent(
+  'assistant',
+  { id: runId, input: text, output: (r) => r.reply, failure: (r) => (r.ok ? undefined : r.code) },
+  () => runAgent(text),
+);
+
+await traceTool(
+  'get_weather',
+  { callId, description: 'Gets the weather for a city.', arguments: args, mcpServer: undefined },
+  () => tools.call('get_weather', args),
+);
+
+const hits = await traceRetrieval(
+  'notes',
+  {
+    query,
+    system: 'sqlite',
+    topK: 5,
+    documents: (rows) => rows.map((r) => ({ id: r.id, score: r.score, content: r.text, metadata: { source: r.file } })),
+  },
+  () => search(query, 5),
+);
+
+await traceWorkflow('ingest', { resultAttributes: (r) => ({ 'app.pages': r.pages }) }, () => ingest(file));
+```
+
+| Helper | Span | Carries |
+|---|---|---|
+| `traceAgent` | `invoke_agent {name}` (AGENT) | agent name and id, conversation id, input and output (content) |
+| `traceTool` | `execute_tool {name}` (TOOL) | call id, description, type; `mcp.server.name` and `mcp.method.name` for an MCP tool; arguments and result (content) |
+| `traceRetrieval` | `retrieve {collection}` (RETRIEVER) | store, top-k, rows returned, `rag.result.score_*`, the documents in rank order (ids and scores always; text, metadata and query with content) |
+| `traceWorkflow` | `{name}` (CHAIN) | input and output (content) |
+
+Every helper nests what runs inside it, across `await`; records content only with
+`enableContentCapture`; records an error's type always and its message only with content
+capture; and takes `attributes` (at start), `resultAttributes` (from the result, not content)
+and `parent`. They are in every entry, Node included.
+
+The SDK registers the global tracer provider, so the rest of the app can also add spans with
 `@opentelemetry/api` and they go to the same collector.
 
 React Native has no async context of its own, so the SDK registers a context manager that
@@ -143,6 +188,7 @@ Phoenix and others) need them and ignore the rest:
 | Attribute | Where | Why |
 |---|---|---|
 | `openinference.span.kind` | every span | how those backends classify a span: `LLM`, `EMBEDDING`, `RETRIEVER`, `TOOL`, `AGENT`, `CHAIN`. Instrumented spans set it themselves; for your own spans it comes from `gen_ai.operation.name` or the span name (`invoke_agent ...` is `AGENT`, `execute_tool ...` `TOOL`, `retrieve ...` `RETRIEVER`, other internal spans `CHAIN`). One you set yourself is kept. Without it, an operation outside the GenAI registry (speech to text, a model load, a pipeline step) shows as "unknown" |
+| `graph.node.id`, `graph.node.parent_id`, `graph.node.name`, `graph.node.display_name`, `agent.name` | every span that names an agent | the agent graph (from `0.1.0-alpha.8`, as the Python library's 1.44.0): each agent is a node, its parent the nearest enclosing agent, so an agent started by another (a skill run by an assistant) is its child. Turned off with `GENAI_ENABLE_AGENT_GRAPH_ATTRIBUTES: 'false'` in `instrument()` |
 | `openinference.project.name` | the resource | the project the traces are filed under: the service name, or `OPENINFERENCE_PROJECT_NAME` passed to `instrument()`. Arize AX rejects a trace without one |
 
 Content the span already carries (from `0.1.0-alpha.6`) is also exported under the names
@@ -192,10 +238,24 @@ instrument({
 });
 ```
 
-To send to two backends at once (your own collector and a hosted one), export to the
-collector and add an exporter per backend there, or give `instrument()` a `fetch` that
-also posts each request to the second endpoint with its own headers (the
-[LiquidChat](https://github.com/Mandark-droid/LiquidChat) app does the latter).
+To send to more than one backend at once (your own collector and a hosted one), list the
+others in `additionalDestinations` (from `0.1.0-alpha.7`). Each gets the same telemetry with its
+own headers; the main endpoint's headers are never sent to them, and a destination that fails
+is logged as a warning:
+
+```ts
+instrument({
+  serviceName: 'my-app',
+  endpoint: 'https://otel.example.com',
+  headers: { Authorization: 'Bearer …' },
+  additionalDestinations: [
+    { endpoint: 'https://otlp.arize.com', headers: { space_id: '<space id>', api_key: '<api key>' } },
+  ],
+});
+```
+
+A failed export is logged as a warning, not at debug level: a backend that rejects every request
+(a missing header, for example) would otherwise look the same as one that accepts them.
 
 ## Testing against a local collector
 
