@@ -175,6 +175,22 @@ const reply = await traceGenAiCall(
 );
 ```
 
+### Background work
+
+The active context here is the most recent scope still open, so a model call made by
+background work (indexing documents, say) while a long workflow runs would be filed under
+that workflow. Wrap such calls in `detached` (from `0.1.0-alpha.10`): each becomes its own
+trace, and no scope is opened that could take over the workflow's spans.
+
+```ts
+import { detached } from '@traceverse/genai-otel-instrument-node/react-native';
+
+const { embedding } = await detached(() => model.embed({ text: chunk }));
+```
+
+Only spans started while `fn` runs synchronously are covered, so wrap each call rather than
+a whole `async` task.
+
 ## Backends
 
 Export is plain OTLP/HTTP, so any OpenTelemetry backend works: point `endpoint` at it and
