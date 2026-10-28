@@ -145,8 +145,42 @@ Phoenix and others) need them and ignore the rest:
 | `openinference.span.kind` | every span | how those backends classify a span: `LLM`, `EMBEDDING`, `RETRIEVER`, `TOOL`, `AGENT`, `CHAIN`. Instrumented spans set it themselves; for your own spans it comes from `gen_ai.operation.name` or the span name (`invoke_agent ...` is `AGENT`, `execute_tool ...` `TOOL`, `retrieve ...` `RETRIEVER`, other internal spans `CHAIN`). One you set yourself is kept. Without it, an operation outside the GenAI registry (speech to text, a model load, a pipeline step) shows as "unknown" |
 | `openinference.project.name` | the resource | the project the traces are filed under: the service name, or `OPENINFERENCE_PROJECT_NAME` passed to `instrument()`. Arize AX rejects a trace without one |
 
-Other backends store them like any other attribute. To leave the span kind out, pass
+Content the span already carries (from `0.1.0-alpha.6`) is also exported under the names
+those backends display: `input.value` and `output.value` from the GenAI messages, tool
+arguments and results, or the retrieval query; `tool.name`, `tool.description` and
+`tool.parameters` from the tool attributes. It is a copy of what you captured: with content
+capture off there is nothing to copy.
+
+Other backends store them like any other attribute. To leave all of this out, pass
 `openInferenceSpanKinds: false`.
+
+### Retrieved documents
+
+Record what a search returned, in rank order, with `addRetrievalAttributes` (every entry;
+a port of the Python library's `add_retrieval_attributes`, same names and limits):
+
+```ts
+import { addRetrievalAttributes } from '@traceverse/genai-otel-instrument-node/react-native';
+
+const span = tracer.startSpan('retrieve memory', { attributes: { 'gen_ai.operation.name': 'retrieve' } });
+const hits = await search(question);
+addRetrievalAttributes(
+  span,
+  hits.map((h) => ({ id: h.id, score: h.score, content: h.text, metadata: { source: h.file } })),
+  { query: question },
+);
+span.end();
+```
+
+| Attribute | Value |
+|---|---|
+| `retrieval.query` | the query, first 500 characters |
+| `retrieval.documents.{i}.document.id` / `.score` / `.content` | the first five documents in rank order; content truncated to 500 characters |
+| `retrieval.documents.{i}.document.metadata.<key>` | flattened metadata (keys 50, values 200 characters) |
+| `retrieval.document_count` | how many documents came back |
+
+The query and document text are your users' data: pass them only when you capture content.
+Ids and scores alone still show the ranking (LiquidChat does exactly that).
 
 For example, Arize AX takes OTLP directly:
 
