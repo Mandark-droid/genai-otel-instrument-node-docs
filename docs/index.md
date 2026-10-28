@@ -11,8 +11,8 @@ evaluation signals - in the same wire format as the Python library
 |---|---|
 | Package | `@traceverse/genai-otel-instrument-node` |
 | Minimum runtime | Node 18.19 |
-| Reference implementation | `genai_otel_instrument` **v1.30.0** (pinned in `scripts/sync-from-python.mjs`) |
-| Status | Phase 1 (foundation), `0.1.0-alpha` pre-releases. No `v0.1.0` until the end-to-end evidence exists. |
+| Reference implementation | `genai_otel_instrument` **v1.46.0** (pinned in `scripts/sync-from-python.mjs`) |
+| Status | Phase 1 (foundation), `0.1.0-alpha` pre-releases (latest `0.1.0-alpha.9`, contract from the Python library v1.46.0). No `v0.1.0` until the end-to-end evidence exists. |
 
 A backend must not be able to tell which language produced a span except by three
 resource attributes: `telemetry.sdk.language=nodejs`,
