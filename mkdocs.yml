@@ -1,8 +1,8 @@
 site_name: genai-otel-instrument-node
 site_description: OpenTelemetry instrumentation for GenAI applications on Node.js, in browsers and in React Native.
 site_url: https://mandark-droid.github.io/genai-otel-instrument-node-docs/
-repo_url: https://www.npmjs.com/package/@traceverse/genai-otel-instrument-node
-repo_name: "@traceverse/genai-otel-instrument-node"
+repo_url: https://github.com/Mandark-droid/genai-otel-instrument-node
+repo_name: Mandark-droid/genai-otel-instrument-node
 copyright: Copyright © 2026 TraceVerse · Apache-2.0
 theme:
   name: material
