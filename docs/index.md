@@ -12,7 +12,7 @@ evaluation signals - in the same wire format as the Python library
 | Package | `@traceverse/genai-otel-instrument-node` |
 | Minimum runtime | Node 18.19 |
 | Reference implementation | `genai_otel_instrument` **v1.46.0** (pinned in `scripts/sync-from-python.mjs`) |
-| Status | Phase 1 (foundation), `0.1.0-alpha` pre-releases (latest `0.1.0-alpha.9`, contract from the Python library v1.46.0). No `v0.1.0` until the end-to-end evidence exists. |
+| Status | Phase 1 (foundation), `0.1.0-alpha` pre-releases (latest `0.1.0-alpha.11`, contract from the Python library v1.46.0; the A2A and A2UI names from the 1.48.0 code). No `v0.1.0` until the end-to-end evidence exists. |
 
 A backend must not be able to tell which language produced a span except by three
 resource attributes: `telemetry.sdk.language=nodejs`,
@@ -91,6 +91,16 @@ The same package loads in a browser bundle and in a React Native app, through th
 that exports OTLP over `fetch`, and `traceGenAiCall()` for calls the app makes itself.
 There is no default endpoint there: telemetry leaves the device only for a collector you
 name. See [docs/runtimes.md](runtimes.md), including what is and is not sent.
+
+## A2A and A2UI
+
+Calls to other agents (`@a2a-js/sdk` 1.x), the UI an agent sends and what the user did with it
+(A2UI), in Node, browsers and React Native: one `CLIENT` span per A2A call with the trace context
+sent along, `a2ui.*` attributes read off the A2A messages, spans for `@a2ui/agent` and (opt-in)
+`@a2ui/web_core`, and three functions - `recordA2uiReceived`, `recordA2uiSent`,
+`recordA2uiRendererError` - for apps whose transport is not seen. A renderer's validation error is
+on a span even when the app tells nobody; a UI the model wrote badly is an `ERROR` span. Content only
+with content capture on. See [A2A and A2UI](a2a-a2ui.md).
 
 ## What is instrumented
 

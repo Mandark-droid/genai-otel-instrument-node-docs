@@ -24,6 +24,7 @@ nav:
   - Overview: index.md
   - React Native and Cactus: react-native.md
   - Runtimes: runtimes.md
+  - A2A and A2UI: a2a-a2ui.md
   - Configuration: configuration.md
   - Evaluation: evaluation.md
   - Media: media.md

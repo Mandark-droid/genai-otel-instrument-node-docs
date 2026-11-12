@@ -191,6 +191,24 @@ const { embedding } = await detached(() => model.embed({ text: chunk }));
 Only spans started while `fn` runs synchronously are covered, so wrap each call rather than
 a whole `async` task.
 
+## A2A and A2UI in your app
+
+An app that shows an agent's UI is the A2UI **renderer**: it receives the agent's messages and sends the
+user's actions back. Hand the A2A client over once, and the calls carry the trace context to the agent:
+
+```js
+import * as a2aClient from '@a2a-js/sdk/client';
+import { instrumentA2aClient } from '@traceverse/genai-otel-instrument-node';
+
+instrumentA2aClient(a2aClient);   // each call is a CLIENT span; its a2ui.* attributes name the surface, catalog and action
+```
+
+For a transport the SDK does not see (a WebSocket, AG-UI), or a renderer with no A2A client, call
+`recordA2uiReceived(messages)` when the agent's messages arrive, `recordA2uiSent(action)` when the user acts,
+and `recordA2uiRendererError(error)` when the renderer rejects something: they go on the span you are in,
+or open a short one. Renderers built on `@a2ui/web_core` can be traced with `instrumentA2uiWebCore(webCore)`.
+Content (messages, action context, error text) only with content capture on. See [A2A and A2UI](a2a-a2ui.md).
+
 ## Backends
 
 Export is plain OTLP/HTTP, so any OpenTelemetry backend works: point `endpoint` at it and
